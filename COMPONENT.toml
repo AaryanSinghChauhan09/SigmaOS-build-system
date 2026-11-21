@@ -1,5 +1,5 @@
 [component]
-name = "SigmaOS-arch-build-system"
+name = "SigmaOS-build-system"
 tier = 2
 stability = "scaffold"
 language = "rust"

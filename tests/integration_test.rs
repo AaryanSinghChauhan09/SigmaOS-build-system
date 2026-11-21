@@ -1,4 +1,4 @@
-use arch_build_system::Component;
+use sigmaos_build_system::Component;
 
 #[test]
 fn test_component_new_aaa() {
