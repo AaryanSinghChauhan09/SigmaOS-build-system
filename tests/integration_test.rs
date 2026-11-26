@@ -1,5 +1,4 @@
-use sigmaos_build_system::{BuildSystem, BuildManifest, BuildOptions};
-use std::path::PathBuf;
+use sigmaos_build_system::{BuildManifest, BuildOptions, BuildSystem};
 
 #[test]
 fn test_build_manifest_default() {
@@ -10,7 +9,7 @@ fn test_build_manifest_default() {
         packages: vec!["test-package".to_string()],
         build_options: BuildOptions::default(),
     };
-    
+
     assert_eq!(manifest.name, "test");
     assert_eq!(manifest.version, "1.0.0");
     assert_eq!(manifest.packages.len(), 1);
@@ -25,7 +24,7 @@ fn test_build_system_new() {
         packages: vec![],
         build_options: BuildOptions::default(),
     };
-    
+
     let build_system = BuildSystem::new(manifest);
     assert!(build_system.is_ok());
 }

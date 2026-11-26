@@ -1,11 +1,11 @@
 #![forbid(unsafe_code)]
 
 pub mod builder;
+pub mod error;
 pub mod package;
 pub mod verifier;
-pub mod error;
 
-pub use builder::{BuildSystem, BuildManifest, BuildResult, BuildOptions};
+pub use builder::{BuildManifest, BuildOptions, BuildResult, BuildSystem};
+pub use error::BuildError;
 pub use package::{PackageBuilder, PackageFormat};
 pub use verifier::BuildVerifier;
-pub use error::BuildError;
