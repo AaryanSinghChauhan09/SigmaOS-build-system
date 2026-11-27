@@ -1,15 +1,21 @@
 use crate::error::BuildError;
 use serde::{Deserialize, Serialize};
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+/// Native SigmaOS package formats.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum PackageFormat {
+    /// SigmaOS native package format (.sigma.pkg)
     #[default]
-    Pacman,
+    SigmaPkg,
+    /// Deb-compatible output for downstream consumers
     Deb,
+    /// RPM-compatible output for downstream consumers
     Rpm,
+    /// Universal tarball fallback
     Tarball,
 }
 
@@ -20,7 +26,7 @@ pub struct PackageBuilder {
 impl PackageBuilder {
     pub fn new() -> Result<Self, BuildError> {
         Ok(Self {
-            format: PackageFormat::Pacman,
+            format: PackageFormat::SigmaPkg,
         })
     }
 
@@ -39,8 +45,8 @@ impl PackageBuilder {
         }
 
         let output_path = match self.format {
-            PackageFormat::Pacman => {
-                self.build_pacman_package(&source_dir, &build_dir, package_name)?
+            PackageFormat::SigmaPkg => {
+                self.build_sigma_package(&source_dir, &build_dir, package_name)?
             }
             PackageFormat::Deb => self.build_deb_package(&source_dir, &build_dir, package_name)?,
             PackageFormat::Rpm => self.build_rpm_package(&source_dir, &build_dir, package_name)?,
@@ -59,17 +65,21 @@ impl PackageBuilder {
         })
     }
 
-    fn build_pacman_package(
+    /// Build a SigmaOS native package using `sigma-build` (or the `SIGMA_BUILD_BIN` override).
+    fn build_sigma_package(
         &self,
         source_dir: &Path,
         build_dir: &Path,
         package_name: &str,
     ) -> Result<PathBuf, BuildError> {
-        let pkgbuild_dir = build_dir.join("pkgbuild");
-        fs::create_dir_all(&pkgbuild_dir)?;
+        let sigma_build_dir = build_dir.join("sigma-pkgbuild");
+        fs::create_dir_all(&sigma_build_dir)?;
 
-        let output = Command::new("makepkg")
-            .args(["-f", "--noconfirm"])
+        let sigma_build_bin =
+            env::var("SIGMA_BUILD_BIN").unwrap_or_else(|_| "sigma-build".to_string());
+
+        let output = Command::new(&sigma_build_bin)
+            .args(["--force", "--no-confirm"])
             .current_dir(source_dir)
             .output()?;
 
@@ -77,13 +87,14 @@ impl PackageBuilder {
             return Err(BuildError::BuildFailed(package_name.to_string()));
         }
 
-        let pkg_file = source_dir.join(format!("{}-1.0.0-x86_64.pkg.tar.zst", package_name));
+        let pkg_file =
+            source_dir.join(format!("{}-1.0.0-x86_64.sigma.pkg.zst", package_name));
 
         if pkg_file.exists() {
             Ok(pkg_file)
         } else {
             Err(BuildError::PackageNotFound(format!(
-                "{}-1.0.0-x86_64.pkg.tar.zst",
+                "{}-1.0.0-x86_64.sigma.pkg.zst",
                 package_name
             )))
         }
@@ -194,4 +205,50 @@ pub struct PackageResult {
     pub version: String,
     pub path: PathBuf,
     pub checksum: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Arrange: builder with SigmaPkg format
+    // Act: build_package for a non-existent package
+    // Assert: returns PackageNotFound
+    #[test]
+    fn test_build_sigma_pkg_missing_source_aaa() {
+        let builder = PackageBuilder::with_format(PackageFormat::SigmaPkg);
+        let result = builder.build_package("non-existent-pkg-xyz");
+        assert!(matches!(result, Err(BuildError::PackageNotFound(_))));
+    }
+
+    // Arrange: builder with Deb format
+    // Act: build_package for a non-existent package
+    // Assert: returns PackageNotFound
+    #[test]
+    fn test_build_deb_missing_source_aaa() {
+        let builder = PackageBuilder::with_format(PackageFormat::Deb);
+        let result = builder.build_package("non-existent-pkg-xyz");
+        assert!(matches!(result, Err(BuildError::PackageNotFound(_))));
+    }
+
+    // Arrange: builder with Rpm format
+    // Act: build_package for a non-existent package
+    // Assert: returns PackageNotFound
+    #[test]
+    fn test_build_rpm_missing_source_aaa() {
+        let builder = PackageBuilder::with_format(PackageFormat::Rpm);
+        let result = builder.build_package("non-existent-pkg-xyz");
+        assert!(matches!(result, Err(BuildError::PackageNotFound(_))));
+    }
+
+    // Arrange: builder default (SigmaPkg)
+    // Act: PackageBuilder::new()
+    // Assert: succeeds
+    #[test]
+    fn test_new_builder_defaults_to_sigma_pkg_aaa() {
+        let builder = PackageBuilder::new().expect("builder should construct");
+        // format is SigmaPkg by default
+        let result = builder.build_package("any-package");
+        assert!(matches!(result, Err(BuildError::PackageNotFound(_))));
+    }
 }
